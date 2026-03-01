@@ -58,7 +58,7 @@ const Navbar = () => {
         {/* Button */}
         <button
           onClick={() => scrollToSection("beranda")}
-          className="px-6 py-2 bg-[#4361EE] text-white rounded-lg shadow-md hover:opacity-90 transition"
+          className="hidden md:block px-6 py-2 bg-[#4361EE] text-white rounded-lg shadow-md hover:opacity-90 transition"
         >
           Unggah
         </button>
@@ -85,13 +85,6 @@ const Navbar = () => {
                 {item.name}
               </button>
             ))}
-
-            <button
-              onClick={() => scrollToSection("beranda")}
-              className="px-6 py-2 bg-[#4361EE] text-white rounded-lg"
-            >
-              Unggah
-            </button>
           </div>
         </div>
       )}

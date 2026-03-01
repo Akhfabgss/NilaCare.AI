@@ -59,7 +59,7 @@ export default function FAQSection() {
 
         {/* Title */}
         <h2 
-          className="text-white text-2xl md:text-4xl font-bold mb-16"
+          className="text-white text-2xl md:text-4xl font-bold mb-6 md:mb-16"
           data-aos="fade-down"
         >
           Pertanyaan yang sering diajukan

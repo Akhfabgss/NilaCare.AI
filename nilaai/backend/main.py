@@ -12,9 +12,9 @@ from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 from tensorflow.keras.models import load_model
 
 try:
-    from backend.labels import LABELS
+    from backend.labels import LABELS, LABEL_FULL_NAMES
 except ModuleNotFoundError:
-    from labels import LABELS
+    from labels import LABELS, LABEL_FULL_NAMES
 
 ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
 DEFAULT_INPUT_SIZE = (224, 224)
@@ -137,7 +137,8 @@ async def predict(file: Annotated[UploadFile, File(...)]) -> dict[str, Any]:
 
         top_index = int(np.argmax(probabilities))
         confidence = float(probabilities[top_index])
-        label = LABELS[top_index] if top_index < len(LABELS) else f"Unknown_{top_index}"
+        label_code = LABELS[top_index] if top_index < len(LABELS) else f"Unknown_{top_index}"
+        label = LABEL_FULL_NAMES.get(label_code, label_code)
 
         return {
             "label": label,

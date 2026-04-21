@@ -3,10 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Camera, FileUp, ImageIcon } from "lucide-react";
 import { predictDisease, type PredictResponse } from "@/lib/predictApi";
+import { sendChat, type ChatContext } from "@/lib/chatApi";
 
 type UiState = "idle" | "loading" | "success" | "error";
+type ChatMessage = { role: "user" | "assistant"; text: string };
 
 const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const MAX_CHAT_LENGTH = 500;
 
 export default function Home() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -15,8 +18,13 @@ export default function Home() {
   const [uiState, setUiState] = useState<UiState>("idle");
   const [result, setResult] = useState<PredictResponse | null>(null);
   const [errorText, setErrorText] = useState<string>("");
+  const [chatInput, setChatInput] = useState<string>("");
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const [chatErrorText, setChatErrorText] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const isImageUploaded = selectedFile !== null;
 
   const resetResultState = () => {
     setUiState("idle");
@@ -56,6 +64,9 @@ export default function Home() {
     setSelectedFile(file);
     setPreviewUrl(file);
     resetResultState();
+    setChatMessages([]);
+    setChatInput("");
+    setChatErrorText("");
     setShowOptions(false);
   };
 
@@ -77,6 +88,42 @@ export default function Home() {
         error instanceof Error ? error.message : "Terjadi kesalahan saat memproses gambar.";
       setUiState("error");
       setErrorText(message);
+    }
+  };
+
+  const handleSendChat = async () => {
+    if (!isImageUploaded || isChatLoading) {
+      return;
+    }
+
+    const trimmedInput = chatInput.trim();
+
+    if (!trimmedInput) {
+      return;
+    }
+
+    if (trimmedInput.length > MAX_CHAT_LENGTH) {
+      setChatErrorText("Maksimal 500 karakter per pesan.");
+      return;
+    }
+
+    const userMessage: ChatMessage = { role: "user", text: trimmedInput };
+    const context: ChatContext | undefined = result
+      ? { label: result.label, confidence: result.confidence }
+      : undefined;
+
+    setChatInput("");
+    setChatErrorText("");
+    setChatMessages((prev) => [...prev, userMessage]);
+    setIsChatLoading(true);
+
+    try {
+      const response = await sendChat(trimmedInput, context);
+      setChatMessages((prev) => [...prev, { role: "assistant", text: response.reply }]);
+    } catch {
+      setChatErrorText("Chat sedang bermasalah. Coba kirim ulang dalam beberapa saat.");
+    } finally {
+      setIsChatLoading(false);
     }
   };
 
@@ -298,6 +345,77 @@ export default function Home() {
                 </p>
               </div>
             ) : null}
+          </div>
+
+          <div className="mt-8 w-full max-w-3xl mx-auto bg-white border border-gray-200 rounded-xl p-4">
+            <h3 className="text-lg font-semibold text-[#5A2BBF]">Chat Asisten NilaCare.AI</h3>
+            <p className="text-sm text-gray-600 mt-1">
+              {isImageUploaded
+                ? "Tanyakan gejala, pencegahan, atau penanganan awal ikan nila."
+                : "Upload gambar terlebih dahulu untuk mengaktifkan chat."}
+            </p>
+
+            <div className="mt-4 h-56 overflow-y-auto bg-[#F9FAFB] border border-gray-200 rounded-lg p-3 space-y-2">
+              {chatMessages.length === 0 ? (
+                <p className="text-sm text-gray-500">Belum ada percakapan.</p>
+              ) : (
+                chatMessages.map((message, index) => (
+                  <div
+                    key={`${message.role}-${index}`}
+                    className={`text-sm rounded-lg px-3 py-2 whitespace-pre-wrap ${
+                      message.role === "user"
+                        ? "bg-[#E8EEFF] text-[#1F2A44] ml-8"
+                        : "bg-white border border-gray-200 text-gray-800 mr-8"
+                    }`}
+                  >
+                    <p className="font-semibold mb-1">
+                      {message.role === "user" ? "Anda" : "Asisten"}
+                    </p>
+                    <p>{message.text}</p>
+                  </div>
+                ))
+              )}
+
+              {isChatLoading ? <p className="text-sm text-gray-500">Asisten sedang mengetik...</p> : null}
+            </div>
+
+            <div className="mt-3 flex flex-col gap-2">
+              <textarea
+                value={chatInput}
+                onChange={(event) => {
+                  const nextValue = event.target.value;
+                  if (nextValue.length <= MAX_CHAT_LENGTH) {
+                    setChatInput(nextValue);
+                  }
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    void handleSendChat();
+                  }
+                }}
+                placeholder="Contoh: Apa langkah awal jika ikan nila tampak lesu?"
+                disabled={!isImageUploaded || isChatLoading}
+                rows={3}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm disabled:bg-gray-100 disabled:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#4361EE]"
+              />
+
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs text-gray-500">{chatInput.length}/{MAX_CHAT_LENGTH}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleSendChat();
+                  }}
+                  disabled={!isImageUploaded || isChatLoading || !chatInput.trim()}
+                  className="px-5 py-2 bg-[#4361EE] text-white text-sm rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition"
+                >
+                  {isChatLoading ? "Mengirim..." : "Kirim"}
+                </button>
+              </div>
+
+              {chatErrorText ? <p className="text-sm text-red-600">{chatErrorText}</p> : null}
+            </div>
           </div>
         </section>
 

@@ -96,15 +96,21 @@ Frontend default:
 
 - [http://localhost:3000](http://localhost:3000)
 
-## 6) Konfigurasi URL Backend (Opsional)
+## 6) Konfigurasi Environment (`.env.local`)
 
-Frontend default mengarah ke `http://127.0.0.1:8000`.
-
-Jika ingin override, buat file `.env.local` di root proyek:
+Buat file `.env.local` di root proyek:
 
 ```env
-NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
+NEXT_PUBLIC_API_BASE_URL=https://nilacareai.takumifahri.my.id
+GEMINI_API_KEY=your_gemini_api_key
 ```
+
+Keterangan:
+
+- `NEXT_PUBLIC_API_BASE_URL` dipakai frontend untuk request prediksi (`/predict`) ke backend model.
+- `GEMINI_API_KEY` dipakai **server-side** oleh route Next.js `/api/chat` (jangan dipakai di client).
+
+Jika variabel `NEXT_PUBLIC_API_BASE_URL` tidak diisi, frontend fallback ke `http://127.0.0.1:8000` untuk dev lokal.
 
 Lalu restart frontend (`npm run dev`).
 

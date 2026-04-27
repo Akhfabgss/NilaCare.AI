@@ -3,8 +3,10 @@ export type PredictResponse = {
   confidence: number;
 };
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
-const PREDICT_URL = `${API_BASE_URL.replace(/\/$/, "")}/predict`;
+const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000";
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || DEFAULT_API_BASE_URL;
+const PREDICT_URL = `${API_BASE_URL.replace(/\/+$/, "")}/predict`;
 
 export async function predictDisease(file: File): Promise<PredictResponse> {
   const formData = new FormData();
@@ -38,7 +40,7 @@ export async function predictDisease(file: File): Promise<PredictResponse> {
         ? responseBody.detail
         : "Gagal memproses prediksi.";
 
-    throw new Error(detail);
+    throw new Error(`Request prediksi gagal (${response.status}): ${detail}`);
   }
 
   if (

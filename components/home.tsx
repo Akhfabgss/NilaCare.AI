@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Camera, FileUp, ImageIcon } from "lucide-react";
 import { predictDisease, type PredictResponse } from "@/lib/predictApi";
-import { sendChat, type ChatContext } from "@/lib/chatApi";
+import { sendChat, type ChatContext, type ChatImagePayload, type ChatPrediction } from "@/lib/chatApi";
+import { getDiseaseTemplate } from "@/lib/diseaseTemplates";
 
 type UiState = "idle" | "loading" | "success" | "error";
 type ChatMessage = { role: "user" | "assistant"; text: string };
@@ -22,6 +23,8 @@ export default function Home() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [chatErrorText, setChatErrorText] = useState<string>("");
+  const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const [imageMimeType, setImageMimeType] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const isImageUploaded = selectedFile !== null;
@@ -30,6 +33,8 @@ export default function Home() {
     setUiState("idle");
     setResult(null);
     setErrorText("");
+    setImageBase64(null);
+    setImageMimeType(null);
   };
 
   const setPreviewUrl = (file: File) => {
@@ -63,11 +68,27 @@ export default function Home() {
 
     setSelectedFile(file);
     setPreviewUrl(file);
-    resetResultState();
+    // Keep result state but clear image base64 first, then re-read
+    setUiState("idle");
+    setResult(null);
+    setErrorText("");
     setChatMessages([]);
     setChatInput("");
     setChatErrorText("");
     setShowOptions(false);
+
+    // Read file as base64 for multimodal chat
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const dataUrl = evt.target?.result;
+      if (typeof dataUrl === "string") {
+        // Strip the data URL prefix to get raw base64
+        const base64 = dataUrl.split(",")[1] ?? "";
+        setImageBase64(base64);
+        setImageMimeType(file.type);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handlePredict = async () => {
@@ -112,13 +133,22 @@ export default function Home() {
       ? { label: result.label, confidence: result.confidence }
       : undefined;
 
+    const imagePayload: ChatImagePayload | undefined =
+      imageBase64 && imageMimeType
+        ? { imageBase64, imageMimeType }
+        : undefined;
+
+    const prediction: ChatPrediction | undefined = result
+      ? { label: result.label, confidence: result.confidence }
+      : undefined;
+
     setChatInput("");
     setChatErrorText("");
     setChatMessages((prev) => [...prev, userMessage]);
     setIsChatLoading(true);
 
     try {
-      const response = await sendChat(trimmedInput, context);
+      const response = await sendChat(trimmedInput, context, imagePayload, prediction);
       setChatMessages((prev) => [...prev, { role: "assistant", text: response.reply }]);
     } catch {
       setChatErrorText("Chat sedang bermasalah. Coba kirim ulang dalam beberapa saat.");
@@ -337,13 +367,39 @@ export default function Home() {
             ) : null}
 
             {uiState === "success" && result ? (
-              <div className="w-full max-w-md bg-white border border-gray-200 rounded-xl p-4 text-center">
-                <p className="text-sm text-gray-500">Hasil Klasifikasi</p>
-                <p className="text-lg font-semibold text-[#5A2BBF] mt-1">{result.label}</p>
-                <p className="text-sm text-gray-700 mt-1">
-                  Confidence: {(result.confidence * 100).toFixed(2)}%
-                </p>
-              </div>
+              <>
+                {/* Prediction result card */}
+                <div className="w-full max-w-md bg-white border border-gray-200 rounded-xl p-4 text-center">
+                  <p className="text-sm text-gray-500">Hasil Klasifikasi</p>
+                  <p className="text-lg font-semibold text-[#5A2BBF] mt-1">{result.label}</p>
+                  <p className="text-sm text-gray-700 mt-1">
+                    Confidence: {(result.confidence * 100).toFixed(2)}%
+                  </p>
+                </div>
+
+                {/* Static disease template card */}
+                {(() => {
+                  const tpl = getDiseaseTemplate(result.label);
+                  return (
+                    <div className="w-full max-w-md bg-white border border-[#e8e0f7] rounded-xl p-5 text-left shadow-sm">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[#5A2BBF] mb-2">
+                        Informasi Penyakit
+                      </p>
+                      <h4 className="text-base font-bold text-gray-800 mb-2">{tpl.title}</h4>
+                      <p className="text-sm text-gray-700 leading-relaxed mb-3">{tpl.description}</p>
+
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[#5A2BBF] mb-1">
+                        Penanganan Awal
+                      </p>
+                      <p className="text-sm text-gray-700 leading-relaxed mb-4">{tpl.firstAid}</p>
+
+                      <p className="text-xs text-[#4361EE] font-medium border-t border-gray-100 pt-3">
+                        {tpl.cta}
+                      </p>
+                    </div>
+                  );
+                })()}
+              </>
             ) : null}
           </div>
 

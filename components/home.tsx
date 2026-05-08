@@ -4,7 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { Camera, FileUp, ImageIcon } from "lucide-react";
 import { predictDisease, type PredictResponse } from "@/lib/predictApi";
 import { sendChat, type ChatContext, type ChatImagePayload, type ChatPrediction } from "@/lib/chatApi";
-import { getDiseaseTemplate } from "@/lib/diseaseTemplates";
+import {
+  getDiseaseTemplate,
+  isValidLabel,
+  isLowConfidence,
+  LOW_CONFIDENCE_FALLBACK_MESSAGE,
+} from "@/lib/diseaseTemplates";
 
 type UiState = "idle" | "loading" | "success" | "error";
 type ChatMessage = { role: "user" | "assistant"; text: string };
@@ -371,34 +376,44 @@ export default function Home() {
                 {/* Prediction result card */}
                 <div className="w-full max-w-md bg-white border border-gray-200 rounded-xl p-4 text-center">
                   <p className="text-sm text-gray-500">Hasil Klasifikasi</p>
-                  <p className="text-lg font-semibold text-[#5A2BBF] mt-1">{result.label}</p>
+                  <p className="text-lg font-semibold text-[#5A2BBF] mt-1">
+                    {isValidLabel(result.label) ? result.label : "Tidak dikenali"}
+                  </p>
                   <p className="text-sm text-gray-700 mt-1">
                     Confidence: {(result.confidence * 100).toFixed(2)}%
                   </p>
                 </div>
 
-                {/* Static disease template card */}
-                {(() => {
-                  const tpl = getDiseaseTemplate(result.label);
-                  return (
-                    <div className="w-full max-w-md bg-white border border-[#e8e0f7] rounded-xl p-5 text-left shadow-sm">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-[#5A2BBF] mb-2">
-                        Informasi Penyakit
-                      </p>
-                      <h4 className="text-base font-bold text-gray-800 mb-2">{tpl.title}</h4>
-                      <p className="text-sm text-gray-700 leading-relaxed mb-3">{tpl.description}</p>
+                {/* Disease template OR low-confidence fallback */}
+                {isValidLabel(result.label) && !isLowConfidence(result.confidence) ? (
+                  (() => {
+                    const tpl = getDiseaseTemplate(result.label);
+                    return (
+                      <div className="w-full max-w-md bg-white border border-[#e8e0f7] rounded-xl p-5 text-left shadow-sm">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-[#5A2BBF] mb-2">
+                          Informasi Penyakit
+                        </p>
+                        <h4 className="text-base font-bold text-gray-800 mb-2">{tpl.title}</h4>
+                        <p className="text-sm text-gray-700 leading-relaxed mb-3">{tpl.description}</p>
 
-                      <p className="text-xs font-semibold uppercase tracking-wide text-[#5A2BBF] mb-1">
-                        Penanganan Awal
-                      </p>
-                      <p className="text-sm text-gray-700 leading-relaxed mb-4">{tpl.firstAid}</p>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-[#5A2BBF] mb-1">
+                          Penanganan Awal
+                        </p>
+                        <p className="text-sm text-gray-700 leading-relaxed mb-4">{tpl.firstAid}</p>
 
-                      <p className="text-xs text-[#4361EE] font-medium border-t border-gray-100 pt-3">
-                        {tpl.cta}
-                      </p>
-                    </div>
-                  );
-                })()}
+                        <p className="text-xs text-[#4361EE] font-medium border-t border-gray-100 pt-3">
+                          {tpl.cta}
+                        </p>
+                      </div>
+                    );
+                  })()
+                ) : (
+                  <div className="w-full max-w-md bg-amber-50 border border-amber-300 rounded-xl p-5 text-center shadow-sm">
+                    <p className="text-sm font-semibold text-amber-700 leading-relaxed">
+                      {LOW_CONFIDENCE_FALLBACK_MESSAGE}
+                    </p>
+                  </div>
+                )}
               </>
             ) : null}
           </div>
